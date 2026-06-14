@@ -1,0 +1,82 @@
+from dotenv import load_dotenv
+load_dotenv()
+
+import streamlit as st
+from youtube_transcript_api import YouTubeTranscriptApi
+import google.generativeai as genai  # pyright: ignore[reportMissingImports]
+import os
+import re
+
+st.set_page_config(page_title="YT Summarizer", page_icon="🎬", layout="centered")
+
+st.title("🎬 YouTube Summarizer")
+st.caption("Paste any YouTube link → get a clean summary in seconds")
+
+# Configure Gemini
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+def extract_video_id(url):
+    patterns = [
+        r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
+        r'(?:youtu\.be\/)([0-9A-Za-z_-]{11})',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+def get_transcript(video_id):
+    try:
+        ytt = YouTubeTranscriptApi()
+        fetched = ytt.fetch(video_id)
+        full_text = " ".join([item.text for item in fetched])
+        return full_text
+    except Exception as e:
+        st.error(f"Transcript error: {e}")
+        return None
+
+def summarize(transcript, style):
+    style_prompts = {
+        "Quick (3 bullets)": "Summarize this YouTube video transcript in exactly 3 bullet points. Be concise.",
+        "Detailed": "Summarize this YouTube video transcript in detail. Include main points, key insights, and important details. Use bullet points.",
+        "Study Notes": "Convert this YouTube video transcript into clean study notes. Use headers and bullet points. Highlight key concepts and facts.",
+    }
+
+    prompt = f"{style_prompts[style]}\n\nTranscript:\n{transcript[:8000]}"
+
+    model = genai.GenerativeModel("gemini-2.0-flash")
+    response = model.generate_content(prompt)
+    return response.text
+
+# UI
+url = st.text_input("YouTube URL", placeholder="https://www.youtube.com/watch?v=...")
+
+style = st.selectbox("Summary Style", [
+    "Quick (3 bullets)",
+    "Detailed",
+    "Study Notes"
+])
+
+if st.button("✨ Summarize", type="primary"):
+    if not url:
+        st.warning("Please paste a YouTube URL first.")
+    else:
+        video_id = extract_video_id(url)
+        if not video_id:
+            st.error("Couldn't read that URL. Try copying it directly from YouTube.")
+        else:
+            with st.spinner("Fetching transcript..."):
+                transcript = get_transcript(video_id)
+
+            if not transcript:
+                st.error("No transcript found. This video might not have captions enabled.")
+            else:
+                with st.spinner("Summarizing with AI..."):
+                    result = summarize(transcript, style)
+
+                st.success("Done!")
+                st.markdown("### 📋 Summary")
+                st.markdown(result)
+                st.code(result, language=None)
+                word_count = len(result.split())
+                st.caption(f"Summary: {word_count} words from a full video transcript")
