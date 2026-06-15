@@ -2,19 +2,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import streamlit as st
-from youtube_transcript_api import YouTubeTranscriptApi
 import os
 import re
-
 st.set_page_config(page_title="YT Summarizer", page_icon="🎬", layout="centered")
 
 st.title("🎬 YouTube Summarizer")
 st.caption("Paste any YouTube link → get a clean summary in seconds")
-
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-if not GROQ_API_KEY:
-    st.error("Missing GROQ_API_KEY in your .env file.")
-    st.stop()
 
 def extract_video_id(url):
     patterns = [
@@ -29,10 +22,16 @@ def extract_video_id(url):
 
 def get_transcript(video_id):
     try:
-        ytt = YouTubeTranscriptApi()
-        fetched = ytt.fetch(video_id)
-        full_text = " ".join([item.text for item in fetched])
-        return full_text
+        import requests
+        url = f"https://api.supadata.ai/v1/youtube/transcript?videoId={video_id}&text=true"
+        headers = {"x-api-key": os.getenv("SUPADATA_API_KEY")}
+        response = requests.get(url, headers=headers)
+        data = response.json()
+        if "content" in data:
+            return data["content"]
+        else:
+            st.error("No transcript found for this video.")
+            return None
     except Exception as e:
         st.error(f"Transcript error: {e}")
         return None
@@ -65,7 +64,7 @@ style = st.selectbox("Summary Style", [
     "Study Notes"
 ])
 
-if st.button("✨ Summarize", type="primary"):
+if st.button("Summarize", type="primary"):
     if not url:
         st.warning("Please paste a YouTube URL first.")
     else:
