@@ -3,7 +3,6 @@ load_dotenv()
 
 import streamlit as st
 from youtube_transcript_api import YouTubeTranscriptApi
-import google.generativeai as genai  # pyright: ignore[reportMissingImports]
 import os
 import re
 
@@ -12,8 +11,11 @@ st.set_page_config(page_title="YT Summarizer", page_icon="🎬", layout="centere
 st.title("🎬 YouTube Summarizer")
 st.caption("Paste any YouTube link → get a clean summary in seconds")
 
-# Configure Gemini
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    st.error("Missing GROQ_API_KEY in your .env file.")
+    st.stop()
+
 def extract_video_id(url):
     patterns = [
         r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
@@ -36,17 +38,23 @@ def get_transcript(video_id):
         return None
 
 def summarize(transcript, style):
+    from groq import Groq  # pyright: ignore[reportMissingImports]
+
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
     style_prompts = {
         "Quick (3 bullets)": "Summarize this YouTube video transcript in exactly 3 bullet points. Be concise.",
         "Detailed": "Summarize this YouTube video transcript in detail. Include main points, key insights, and important details. Use bullet points.",
-        "Study Notes": "Convert this YouTube video transcript into clean study notes. Use headers and bullet points. Highlight key concepts and facts.",
+        "Study Notes": "Convert this transcript into clean study notes with headers and bullet points.",
     }
 
     prompt = f"{style_prompts[style]}\n\nTranscript:\n{transcript[:8000]}"
 
-    model = genai.GenerativeModel("gemini-2.0-flash")
-    response = model.generate_content(prompt)
-    return response.text
+    response = client.chat.completions.create(
+     model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message.content
 
 # UI
 url = st.text_input("YouTube URL", placeholder="https://www.youtube.com/watch?v=...")
@@ -73,6 +81,9 @@ if st.button("✨ Summarize", type="primary"):
             else:
                 with st.spinner("Summarizing with AI..."):
                     result = summarize(transcript, style)
+
+                if not result:
+                    st.stop()
 
                 st.success("Done!")
                 st.markdown("### 📋 Summary")
