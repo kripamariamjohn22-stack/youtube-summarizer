@@ -1,5 +1,13 @@
 # 🎬 YouTube Summarizer
 
+## 🚀 Live Demo
+
+https://youtube-summarizer-jhigwhntzmy3d3ieeqfgia.streamlit.app/
+
+## 📸 Screenshot
+
+<img width="1348" height="669" alt="Screenshot 2026-06-15 213032" src="https://github.com/user-attachments/assets/b6bb7ee9-9986-46e1-abe4-b5afe9864d4d" />
+
 > Paste any YouTube link → get a clean AI-powered summary in seconds.
 
 ## Features
